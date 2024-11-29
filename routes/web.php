@@ -13,4 +13,8 @@ Route::view('profile', 'profile')
     ->middleware(['auth'])
     ->name('profile');
 
+Volt::route('/users', 'pages.users')
+    ->middleware(['auth', 'verified'])
+    ->name('users');
+
 require __DIR__.'/auth.php';
