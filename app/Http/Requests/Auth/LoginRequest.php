@@ -5,6 +5,7 @@ namespace App\Http\Requests\Auth;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -26,9 +27,27 @@ class LoginRequest extends FormRequest
      */
     public function rules(): array
     {
+        dd(
+            $this->method(),
+            // $this->query() ?? null,
+            $this->route()?->parameters()['id'],
+            // $this->query()['id'] ?? $this->route()?->parameters()['id'],
+            $this->id ?? $this->route()?->parameters()['id'],
+            $this->all(),
+            $this
+        );
+        // check request method
+        $isUpdateMethod = $this->isMethod('put') || $this->isMethod('patch');
+
         return [
-            'email' => ['required', 'string', 'email'],
-            'password' => ['required', 'string'],
+            'email' => ['required', 'string', 'email', 'max:255'],
+            'password' => [
+                $isUpdateMethod
+                  ? 'sometimes'
+                  : 'required',
+                'string',
+                'max:255'
+            ],
         ];
     }
 

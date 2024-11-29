@@ -15,9 +15,9 @@ class AuthenticatedSessionController extends Controller
      */
     public function store(LoginRequest $request): Response
     {
+        dd('validated data', $request->validationData());
         $request->authenticate();
-
-        $request->session()->regenerate();
+        // $request->session()->regenerate();
 
         return response()->noContent();
     }
