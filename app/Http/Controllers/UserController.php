@@ -6,7 +6,9 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use App\Http\Requests\UserRequest;
 use Illuminate\Support\Facades\DB;
+use App\Http\Resources\UserResource;
 use Illuminate\Support\Facades\Hash;
+use App\Http\Resources\UserCollection;
 
 class UserController extends Controller
 {
@@ -14,6 +16,55 @@ class UserController extends Controller
      * Display a listing of the resource.
      */
     public function index(Request $request)
+    {
+        $query = User::query();
+
+        // Total users count (before filtering)
+        $totalRecords = $query->count();
+
+        // Filter query
+        $filteredQuery = $query
+            ->when($request->has('search'), function ($query) use ($request) {
+                $query->where('name', 'LIKE', "%{$request->search}%")
+                    ->orWhere('email', 'LIKE', "%{$request->search}%")
+                    ->orWhere('contact', 'LIKE', "%{$request->search}%");
+            })
+            ->when($request->has('name'), function ($query) use ($request) {
+                $query->where('name', 'LIKE', "%{$request->name}%");
+            })
+            ->when($request->has('email'), function ($query) use ($request) {
+                $query->where('email', 'LIKE', "%{$request->email}%");
+            })
+            ->when($request->has('contact'), function ($query) use ($request) {
+                $query->where('contact', 'LIKE', "%{$request->contact}%");
+            })
+            ->when($request->has('sort') && $request->has('order'), function ($query) use ($request) {
+                $sortColumn = $request->sort;
+                $sortOrder = $request->order;
+
+                // Validate the 'order' value to ensure it's either 'asc' or 'desc'
+                if (!in_array(strtolower($sortOrder), ['asc', 'desc'])) {
+                    $sortOrder = 'asc';
+                }
+                $query->orderBy($sortColumn, $sortOrder);
+            })
+            ->select('id', 'name', 'email');
+
+        // Filtered records count
+        $filteredRecords = $filteredQuery->count();
+
+        // Paginate the filtered results
+        $paginatedResults = $filteredQuery->paginate($request->perPage ?? 10);
+        // return $paginatedResults;
+
+        return (new UserCollection($paginatedResults))
+            ->additional([
+                'total_records' => $totalRecords,
+                'filtered_records' => $filteredRecords,
+            ]);
+    }
+
+    public function indexOld(Request $request)
     {
         //?search=3210&sort=name&order=desc&page=3&perPage=5
 
@@ -84,7 +135,7 @@ class UserController extends Controller
             return response()->json(['message' => 'No record found.'], 404); // Handle not found
         }
 
-        return response()->json($record);
+        return new UserResource($record);
     }
 
     /**
@@ -99,16 +150,12 @@ class UserController extends Controller
         $userRequest->setMethod($request->method());
 
         // Authenticate request
-
         if (!$userRequest->authorize()) {
             throw new \Illuminate\Auth\Access\AuthorizationException;
         }
-        // dd($userRequest->authorize());
 
         // Get only validated data
         $validatedData = $request->validate($userRequest->rules());
-
-        // return $validatedData;
 
         return DB::transaction(function () use ($validatedData, $id) {
             // Find or create record
@@ -129,7 +176,12 @@ class UserController extends Controller
                     : $oldPassword
             ])->save();
 
-            return response()->json($record, $id ? 200 : 201); // Return appropriate status codes
+            return (new UserResource($record))
+                ->additional([
+                    'message' => 'User created successfully',
+                ])
+                ->response()
+                ->setStatusCode($id ? 200 : 201);   // Return appropriate status codes
         }, 3); // Retry up to 3 times in case of a deadlock
     }
 
