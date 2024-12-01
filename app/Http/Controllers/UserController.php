@@ -17,6 +17,8 @@ class UserController extends Controller
      */
     public function index(Request $request)
     {
+        //?search=3210&sort=name&order=desc&page=3&perpage=5
+
         $query = User::query();
 
         // Total users count (before filtering)
@@ -54,7 +56,7 @@ class UserController extends Controller
         $filteredRecords = $filteredQuery->count();
 
         // Paginate the filtered results
-        $paginatedResults = $filteredQuery->paginate($request->perPage ?? 10);
+        $paginatedResults = $filteredQuery->paginate($request->perpage ?? 10);
         // return $paginatedResults;
 
         return (new UserCollection($paginatedResults))
@@ -62,58 +64,6 @@ class UserController extends Controller
                 'total_records' => $totalRecords,
                 'filtered_records' => $filteredRecords,
             ]);
-    }
-
-    public function indexOld(Request $request)
-    {
-        //?search=3210&sort=name&order=desc&page=3&perPage=5
-
-        $query = User::query();
-
-        // Total users count (before filtering)
-        $total = $query->count();
-
-        // Filter query
-        $filteredQuery = $query
-            ->when($request->has('search'), function ($query) use ($request) {
-                $query->where('name', 'LIKE', "%{$request->search}%")
-                    ->orWhere('email', 'LIKE', "%{$request->search}%")
-                    ->orWhere('contact', 'LIKE', "%{$request->search}%");
-            })
-            ->when($request->has('name'), function ($query) use ($request) {
-                $query->where('name', 'LIKE', "%{$request->name}%");
-            })
-            ->when($request->has('email'), function ($query) use ($request) {
-                $query->where('email', 'LIKE', "%{$request->email}%");
-            })
-            ->when($request->has('contact'), function ($query) use ($request) {
-                $query->where('contact', 'LIKE', "%{$request->contact}%");
-            })
-            ->when($request->has('sort') && $request->has('order'), function ($query) use ($request) {
-                $sortColumn = $request->sort;
-                $sortOrder = $request->order;
-
-                // Validate the 'order' value to ensure it's either 'asc' or 'desc'
-                if (!in_array(strtolower($sortOrder), ['asc', 'desc'])) {
-                    $sortOrder = 'asc';
-                }
-                $query->orderBy($sortColumn, $sortOrder);
-            })
-            ->select('id', 'name', 'email');
-
-        // Paginate the filtered results
-        $paginatedResults = $filteredQuery->paginate($perPage ?? 10);
-
-        return response()->json(array(
-            'current_page' => $paginatedResults->currentPage(),
-            'from' => $paginatedResults->firstItem(),
-            'to' => $paginatedResults->lastItem(),
-            'last_page' => $paginatedResults->lastPage(),
-            'per_page' => $paginatedResults->perPage(),
-            'data' => $paginatedResults->items(),
-            'filtered_total' => $paginatedResults->total(),
-            'total' => $total
-        ));
     }
 
     /**
